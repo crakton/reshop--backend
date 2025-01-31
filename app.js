@@ -116,9 +116,12 @@ const calculateHMAC = (key, content) =>
 
 app.post("/shiprocketapi", async (req, res) => {
 	try {
+		console.log("Received request body:", req.body); // 👈 Debugging line
+
 		const apiKey = process.env.SHIPROCKET_API_KEY;
 		const apiSecret = process.env.SHIPROCKET_SECRET;
 		const { cart_data } = req.body;
+
 		if (!cart_data || !Array.isArray(cart_data.items))
 			throw new Error("Invalid cart data");
 
@@ -127,6 +130,7 @@ app.post("/shiprocketapi", async (req, res) => {
 			redirect_url: process.env.REDIRECT_URL,
 			timestamp: new Date().toISOString(),
 		});
+
 		const signature = calculateHMAC(apiSecret, requestBody);
 		const { data } = await axios.post(process.env.API_ACCESS_URL, requestBody, {
 			headers: {
@@ -135,8 +139,10 @@ app.post("/shiprocketapi", async (req, res) => {
 				"Content-Type": "application/json",
 			},
 		});
+
 		res.status(200).json({ success: true, token: data.result.token });
 	} catch (error) {
+		console.error("Error processing checkout:", error.message); // 👈 Logs error details
 		res.status(500).json({ success: false, message: error.message });
 	}
 });

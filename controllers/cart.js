@@ -13,7 +13,7 @@ router.post("/addtocart", async (req, res) => {
 				.json({ success: false, message: "productsInCart must be an array" });
 		}
 
-		let cart = await Cart.findOne({ cartId });
+		let cart = await Cart.findOne({ userId });
 
 		if (!cart) {
 			cart = new Cart({ userId, cartId, productsInCart });
@@ -25,9 +25,23 @@ router.post("/addtocart", async (req, res) => {
 			});
 		}
 
-		cart.productsInCart = [
-			...new Set([...cart.productsInCart, ...productsInCart]),
-		];
+		// Create a map of existing products by productId
+		const updatedProductsMap = cart.productsInCart.reduce((acc, item) => {
+			acc[item.productId] = item;
+			return acc;
+		}, {});
+
+		// Update quantities for existing products or add new ones
+		productsInCart.forEach((newItem) => {
+			if (updatedProductsMap[newItem.productId]) {
+				updatedProductsMap[newItem.productId].productQty = newItem.productQty;
+			} else {
+				updatedProductsMap[newItem.productId] = newItem;
+			}
+		});
+
+		// Convert map back to array
+		cart.productsInCart = Object.values(updatedProductsMap);
 		await cart.save();
 
 		res
@@ -42,9 +56,10 @@ router.post("/addtocart", async (req, res) => {
 		});
 	}
 });
-
 // Get All Cart Items
 router.get("/cart-items", async (req, res) => {
+	console.log("GET /cart-item", req);
+
 	try {
 		const cartItems = await Cart.find();
 		return res
@@ -61,7 +76,7 @@ router.post("/get-cart", async (req, res) => {
 	try {
 		const { userId, cartId } = req.body;
 		if (userId) {
-			const cart = await Cart.findOne({ userId });
+			const cart = await Cart.find({ userId });
 			if (!cart) {
 				return res
 					.status(404)
@@ -97,15 +112,15 @@ router.post("/get-cart", async (req, res) => {
 
 // Update Cart Quantity
 router.put("/update-quantity", async (req, res) => {
+	console.log("Received request body:", req.body);
+
 	try {
 		const { userId, productId, productQty } = req.body;
 
 		if (!userId || !productId || typeof productQty !== "number") {
-			return res
-				.status(400)
-				.json({
-					message: "userId, productId, and a valid productQty are required.",
-				});
+			return res.status(400).json({
+				message: "userId, productId, and a valid productQty are required.",
+			});
 		}
 
 		// Find the user's cart
